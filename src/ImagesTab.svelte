@@ -31,6 +31,7 @@
     }
     ul {
         margin: 10px;
+        list-style-type: none;
     }
 </style>
 

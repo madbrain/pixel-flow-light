@@ -141,6 +141,9 @@
     div.toolbar.hide {
         display: none;
     }
+    .layer-selector ul {
+        list-style-type: none;
+    }
     div.layer-selector {
         position: absolute;
         bottom: 35px;
