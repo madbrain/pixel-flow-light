@@ -1,18 +1,17 @@
 import { NodeGroup, Node, PropertyType, NodeProperty } from "@madbrain/node-graph-editor";
-import { EvaluationResult, Processor, processors } from "./nodes";
+import { EvaluationResult, Globals, Preview, Processor, processors } from "./nodes";
 
 const processorByType = new Map<string, Processor>();
 
 processors.forEach(processor => processorByType.set(processor.nodeDefinition.id, processor));
 
-function evaluateNode(type: string, inputs: {[id: string]: any}): EvaluationResult  {
+function evaluateNode(type: string, inputs: {[id: string]: any}, globals: Globals): EvaluationResult  {
     const processor = processorByType.get(type);
 
     if (processor) {
-        return processor.evaluate(inputs);
-    } else {
-        console.log("Unknown processor", type)
+        return processor.evaluate(inputs, globals);
     }
+    console.log("Unknown processor", type)
     return { outputs: {} };
 }
 
@@ -66,23 +65,34 @@ class InputValue {
 class NodeInstance {
 
     needEvaluation = true;
-    outputs = new Map<NodeProperty, OutputValue>();
+    outputs = new Map<string, OutputValue>();
     previous: NodeInstance[] = [];
-    inputs = new Map<NodeProperty, InputValue>();
+    inputs = new Map<string, InputValue>();
     preview: ImageData;
     
     constructor (public node: Node) {
         this.node.properties
             .forEach(prop => {
                 if (prop.definition.type == PropertyType.OUTPUT) {
-                    this.outputs.set(prop, new OutputValue());
+                    this.outputs.set(prop.definition.id, new OutputValue());
                 } else {
-                    this.inputs.set(prop, new InputValue(prop));
+                    this.inputs.set(prop.definition.id, new InputValue(prop));
                 }
             });
     }
 
-    link(instanceMap: Map<Node, NodeInstance>): void {
+    update(node: Node) {
+        this.node = node;
+        this.node.properties
+            .forEach(prop => {
+                if (prop.definition.type == PropertyType.INPUT) {
+                    this.inputs.get(prop.definition.id).property = prop;
+                }
+            });
+        return this;
+    }
+
+    link(instanceMap: Map<string, NodeInstance>): void {
         this.previous = [];
         this.node.properties
             .filter(prop => prop.definition.type == PropertyType.INPUT)
@@ -90,28 +100,29 @@ class NodeInstance {
                 if (prop.isConnected()) {
                     const connection = prop.connections[0];
                     const oppositeProp = connection.opposite(prop);
-                    const oppositeNode = instanceMap.get(oppositeProp.node);
+                    const oppositeNode = instanceMap.get(oppositeProp.node.id);
                     this.previous.push(oppositeNode);
-                    this.inputs.get(prop).update(oppositeNode.outputs.get(oppositeProp));
+                    this.inputs.get(prop.definition.id).update(oppositeNode.outputs.get(oppositeProp.definition.id));
                 } else {
-                    this.inputs.get(prop).update(null);
+                    this.inputs.get(prop.definition.id).update(null);
                 }
             });
     }
 
-    evaluate(previews: { [name: string]: ImageData }): void {
+    evaluate(previews: { [name: string]: Preview }, globals: Globals): void {
         this.updateNeedEvaluation();
         if (this.needEvaluation) {
+            console.log("Evaluating ", this.node.definition.id);
             const inputs = {};
             for (let [prop, value] of this.inputs.entries()) {
-                inputs[prop.definition.id] = value.getValue();
+                inputs[prop] = value.getValue();
             }
-            const { outputs, preview } = evaluateNode(this.node.definition.id, inputs);
+            const { outputs, preview } = evaluateNode(this.node.definition.id, inputs, globals);
             if (preview) {
                 previews[this.node.id] = preview;
             }
             for (let [prop, output] of this.outputs.entries()) {
-                output.update(outputs[prop.definition.id]);
+                output.update(outputs[prop]);
             }
             for(let input of this.inputs.values()) {
                 input.dirty = false;
@@ -127,30 +138,38 @@ class NodeInstance {
     }
 
     private updateNeedEvaluation() {
-        this.inputs
-            .forEach(value => {
-                if (value.isDirty()) {
-                    this.needEvaluation = true;
-                }
-            });
-        this.needEvaluation;
+        this.inputs.forEach(value => {
+            if (value.isDirty()) {
+                this.needEvaluation = true;
+            }
+        });
     }
+}
+
+export type Previews = { [name: string]: Preview };
+
+export interface ProgressMonitor {
+    start();
+    progress(amount: number, message: string);
+    end();
 }
 
 export class Engine {
 
+    constructor(private globals: Globals, private progressMonitor: ProgressMonitor) {}
+
     private instances: NodeInstance[] = [];
 
-    update(graph: NodeGroup): { [name: string]: ImageData } {
+    update(graph: NodeGroup): Previews {
 
         // Sync
-        let instanceMap = new Map<Node, NodeInstance>();
-        this.instances.forEach(instance => instanceMap.set(instance.node, instance));
+        let instanceMap = new Map<string, NodeInstance>();
+        this.instances.forEach(instance => instanceMap.set(instance.node.id, instance));
         this.instances = graph.nodes.map(node => {
-            const instance = instanceMap.get(node);
-            return instance ? instance : new NodeInstance(node);
+            const instance = instanceMap.get(node.id);
+            return instance ? instance.update(node) : new NodeInstance(node);
         });
-        this.instances.forEach(instance => instanceMap.set(instance.node, instance));
+        this.instances.forEach(instance => instanceMap.set(instance.node.id, instance));
         this.instances.forEach(instance => instance.link(instanceMap));
 
         // Topological sort
@@ -166,10 +185,15 @@ export class Engine {
         }
 
         // Evaluate
-        let previews = {};
+        let previews: Previews = {};
+        this.progressMonitor.start();
+        let count = 0;
         this.instances.forEach(instance => {
-            instance.evaluate(previews);
+            this.progressMonitor.progress(count++ / this.instances.length, instance.node.definition.label);
+            instance.evaluate(previews, this.globals);
+            this.progressMonitor.progress(count / this.instances.length, instance.node.definition.label);
         });
+        this.progressMonitor.end();
         this.instances.forEach(instance => {
             instance.clearOutputsDirty();
         });

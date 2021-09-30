@@ -6,6 +6,7 @@
     import { nodeFactory, graphicalHelper } from "./nodes";
     import { graph } from "./store";
     import TabContainer from './TabContainer.svelte';
+    import ProgressMonitor from './ProgressMonitor.svelte';
 
     export let nodeGroup = { nodes: [], connections: [] };
     let element;
@@ -40,3 +41,4 @@
 <div class="editor" bind:this={element}>
 </div>
 <TabContainer />
+<ProgressMonitor />

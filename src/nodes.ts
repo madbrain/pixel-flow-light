@@ -8,8 +8,13 @@ import { argmax, binarization, buildHistogram, distanceImage, otsuLevels, toGray
 import { pointAt, Rectangle } from "./geometry";
 import { ImageMode } from "./ocr/image";
 import { MarchingSquare } from "./ocr/marching-square";
-import { CatalogImage, Layer, viewerContent } from "./store";
+import type { CatalogImage, Layer, ViewerModel } from "./store";
 import { catalog } from "./store";
+
+export interface Globals {
+    getImages(): CatalogImage[];
+    setViewer(content: ViewerModel);
+}
 
 enum PixelFlowValueType {
     COLOR = "color",
@@ -34,14 +39,18 @@ const CATALOG_IMAGE: ValueDefinition = {
     type: PixelFlowValueType.CATALOG_IMAGE
 };
 
+export interface Preview {
+    type: string;
+}
+
 export interface EvaluationResult {
     outputs: { [id: string]: any };
-    preview?: ImageData;
+    preview?: Preview;
 }
 
 export interface Processor {
     nodeDefinition: NodeDefinition;
-    evaluate(inputs: {[id: string]: any}): EvaluationResult;
+    evaluate(inputs: {[id: string]: any}, globals?: Globals): EvaluationResult;
 }
 
 const inputImageProcessor = {
@@ -68,14 +77,14 @@ const inputImageProcessor = {
             }
         ]
     },
-    evaluate: (inputs: {[id: string]: any}) => {
+    evaluate: (inputs: {[id: string]: any}, globals: Globals) => {
         const outputs = {};
         let preview = undefined;
         if (inputs["name"]) {
-            const catalogImage = images.find(image => image.name == inputs["name"]);
+            const catalogImage = globals.getImages().find(image => image.name == inputs["name"]);
             if (catalogImage) {
                 outputs["image"] = catalogImage.data;
-                preview = outputs["image"];
+                preview = { type: "image-preview", image: outputs["image"] };
             }
         }
         return { outputs, preview };
@@ -105,15 +114,11 @@ const viewerProcessor = {
             }
         ]
     },
-    evaluate: (inputs: {[id: string]: any}) => {
+    evaluate: (inputs: {[id: string]: any}, globals: Globals) => {
         const outputs = {};
         let preview = undefined;
         if (inputs["image"]) {
             const inputImage = <ImageData>inputs["image"];
-            chartCanvas.width = inputImage.width;
-            chartCanvas.height = inputImage.height;
-            chartContext.clearRect(0, 0, inputImage.width, inputImage.height);
-            chartContext.putImageData(inputImage, 0, 0);
             let layers: Layer[] = [];
             let marks: Rectangle[] = [];
             if (inputs["marks"]) {
@@ -132,25 +137,14 @@ const viewerProcessor = {
                     newLayer("smalls", block.smalls.map(b => b.boundingBox()));
                     newLayer("larges", block.larges.map(b => b.boundingBox())); 
                 }
-
-                chartContext.strokeStyle = "#0000FF";
-                for (let i = 0; i < marks.length; ++i) {
-                    const r = marks[i];
-                    chartContext.beginPath();
-                    chartContext.rect(r.x, r.y, r.width, r.height);
-                    chartContext.closePath();
-                    chartContext.stroke();
-                }
             }
-            preview = chartContext.getImageData(0, 0, inputImage.width, inputImage.height);
-            viewerContent.set({ image: inputImage, layers });
+            globals.setViewer({ image: inputImage, layers });
+
+            preview = { type: "viewer-preview", inputImage, marks };
         }
         return { outputs, preview };
     }
 };
-
-const chartCanvas = document.createElement("canvas");
-const chartContext = chartCanvas.getContext("2d"); 
 
 const chartViewerProcessor = {
     nodeDefinition: {
@@ -173,24 +167,7 @@ const chartViewerProcessor = {
         let preview = undefined;
         if (inputs["values"]) {
             const values = <number[]>inputs["values"];
-            chartCanvas.width = 500;
-            chartCanvas.height = 500;
-            chartContext.clearRect(0, 0, 500, 500);
-            const step = 500 / values.length;
-            let max = 0;
-            for (let i = 0; i < values.length; ++i) {
-                max = Math.max(max, values[i]);
-            }
-            chartContext.fillStyle = "#4a83fd";
-            chartContext.beginPath();
-            chartContext.moveTo(0, 500);
-            for (let i = 0; i < values.length; ++i) {
-                const height = 500 * values[i] / max;
-                chartContext.lineTo(i*step, 500 - height);
-            }
-            chartContext.closePath();
-            chartContext.fill();
-            preview = chartContext.getImageData(0, 0, 500, 500);
+            preview = { type: "chart-preview", values };
         }
         return { outputs, preview };
     }

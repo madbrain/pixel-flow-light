@@ -20,5 +20,6 @@ export const graph = writable({ nodes: [] });
 
 export const catalog = writable([]);
 
-
 export const viewerContent = writable(null);
+
+export const progressMonitor = writable(null);

@@ -1,14 +1,11 @@
 
-const canvas = document.createElement("canvas");
-const ctx = canvas.getContext("2d");
-
 export function clipToRange(value: number, min: number, max: number) {
     return Math.max(Math.min(value, max), min);
 }
 
 export function toGrayscale(imageData: ImageData) {
     // https://en.wikipedia.org/wiki/SRGB
-    const newImage = ctx.createImageData(imageData);
+    const newImage = new ImageData(imageData.width, imageData.height);
     function putPixel(i, c) {
         newImage.data[i] = c & 0xFF;
         newImage.data[i+1] = c & 0xFF;
@@ -79,7 +76,7 @@ export function argmax(values: number[]) {
 }
 
 export function binarization(imageData: ImageData, threshold: number) {
-    const newImage = ctx.createImageData(imageData);
+    const newImage = new ImageData(imageData.width, imageData.height);
     function putPixel(i, c) {
         newImage.data[i] = c & 0xFF;
         newImage.data[i+1] = c & 0xFF;
@@ -130,7 +127,7 @@ export function distanceImage(image: ImageData) {
             }
         }
     }
-    const newImage = ctx.createImageData(image.width, image.height);
+    const newImage = new ImageData(image.width, image.height);
     function putPixel(i: number, c: number) {
         newImage.data[i+0] = c & 0xFF;
         newImage.data[i+1] = c & 0xFF;
