@@ -3,6 +3,7 @@
     import { faPlus, faMinus, faCrosshairs, faLayerGroup } from '@fortawesome/free-solid-svg-icons';
     import RoundButton from "./components/RoundButton.svelte";
     import { viewerContent } from "./store";
+import ToolBar from "./components/ToolBar.svelte";
 
     const ZOOM_STEP = 1.2;
 
@@ -24,6 +25,13 @@
 
     let hideLayerSelector = true;
     let selectedLayers = {};
+
+    const buttons = [
+        { action: zoomFit, icon:  faCrosshairs },
+        { action: zoomIn, icon:  faPlus },
+        { action: zoomOut, icon:  faMinus },
+        { action: layerSelect, icon:  faLayerGroup }
+    ];
 
     onMount(() => {
         context = canvasElement.getContext("2d");
@@ -133,18 +141,10 @@
         height: 100%;
         position: relative;
     }
-    div.toolbar {
-        position: absolute;
-        bottom: 10px;
-        right: 10px;
-    }
-    div.toolbar.hide {
-        display: none;
-    }
     .layer-selector ul {
         list-style-type: none;
     }
-    div.layer-selector {
+    .layer-selector {
         position: absolute;
         bottom: 35px;
         right: 0;
@@ -153,17 +153,13 @@
         background-color: var(--editor-color);
         padding: 10px;
     }
-    div.layer-selector.hide {
+    .layer-selector.hide {
         display: none;
     }
 </style>
 
 <div class="main" bind:this={contentElement}>
-    <div class="toolbar" class:hide={height==0}>
-        <RoundButton on:click={() => zoomFit()} icon={faCrosshairs}/>
-        <RoundButton on:click={() => zoomIn()} icon={faPlus}/>
-        <RoundButton on:click={() => zoomOut()} icon={faMinus}/>
-        <RoundButton on:click={() => layerSelect()} icon={faLayerGroup}/>
+    <ToolBar {buttons}>
         <div class="layer-selector" class:hide={hideLayerSelector}>
             {#if content && content.layers}
             <ul>
@@ -174,7 +170,7 @@
             </ul>
             {/if}
         </div>
-    </div>
+    </ToolBar>
     <canvas bind:this={canvasElement} {width} {height}
             on:mousedown={mouseDown}
             on:mouseup={mouseUp}

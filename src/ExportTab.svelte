@@ -1,13 +1,13 @@
 <script>
     import { onMount } from "svelte";
-    import { graph } from "./store";
+    import { project } from "./store";
     import { nodeFactory } from "./nodes";
 
     let content = "";
 
     onMount(() => {
-        return graph.subscribe(c => {
-            content = JSON.stringify(nodeFactory.save(c), null, 2);
+        return project.subscribe(p => {
+            content = JSON.stringify(p, null, 2);
         });
     })
 </script>

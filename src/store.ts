@@ -1,5 +1,7 @@
+import type { NodeGroupIO } from "@madbrain/node-graph-editor";
 import {writable} from "svelte/store";
 import type { Rectangle } from "./geometry";
+import { example } from "./examples";
 
 export interface CatalogImage {
     name: string;
@@ -16,7 +18,20 @@ export interface Layer {
     marks: Rectangle[];
 }
 
-export const graph = writable({ nodes: [] });
+export interface Graph {
+    name: string;
+    nodeGroup: NodeGroupIO;
+    selected?: boolean;
+    removable?: boolean;
+}
+
+export interface Project {
+    graphs: Graph[];
+}
+
+export const project = writable<Project>({ graphs: [
+    { name: "Main", nodeGroup: example, selected: true }
+] });
 
 export const catalog = writable([]);
 

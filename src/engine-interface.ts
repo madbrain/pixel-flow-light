@@ -1,9 +1,9 @@
 
-import type { NodeGroup } from "@madbrain/node-graph-editor";
+import type { NodeGroup, NodeGroupIO } from "@madbrain/node-graph-editor";
 import type { Previews } from "./engine";
 import type { Rectangle } from "./geometry";
-import { nodeFactory, Preview } from "./nodes";
-import { catalog, CatalogImage, viewerContent, progressMonitor } from "./store";
+import type { Preview } from "./nodes";
+import { catalog, CatalogImage, viewerContent, progressMonitor, Project } from "./store";
 
 export class EngineInterface {
     worker: Worker;
@@ -35,8 +35,10 @@ export class EngineInterface {
         this.internalContext = this.internalCanvas.getContext("2d"); 
     }
 
-    update(graph: NodeGroup) {
-        this.worker.postMessage({ type: "graph", graph: nodeFactory.save(graph) });
+    update(project: Project) {
+        // TODO handle project!
+        const graph = project.graphs.find(g => g.name === "Main").nodeGroup;
+        this.worker.postMessage({ type: "graph", graph: graph });
     }
 
     private processPreviews(previews: Previews): { [key: string]: ImageData } {

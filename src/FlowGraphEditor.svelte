@@ -4,13 +4,14 @@
     import "@madbrain/node-graph-editor/dist/editor.css";
     import "@madbrain/node-graph-editor/dist/image-kit.css";
     import { nodeFactory, graphicalHelper } from "./nodes";
-    import { graph } from "./store";
+    import { project } from "./store";
     import TabContainer from './TabContainer.svelte';
     import ProgressMonitor from './ProgressMonitor.svelte';
 
-    export let nodeGroup = { nodes: [], connections: [] };
     let element;
     let editor;
+    let currentProject = null;
+    let currentGraph = null;
 
     onMount(() => {
         editor = new GraphEditor({
@@ -20,9 +21,17 @@
         });
         // editor.registerSelector("select-color", new ColorSelector());
         editor.onGraphChange(nodeGroup => {
-            graph.set(nodeGroup);
+            currentGraph.nodeGroup = nodeFactory.save(nodeGroup);
+            project.set(currentProject);
         });
-        editor.load(nodeGroup);
+        project.subscribe(p => {
+            currentProject = p;
+            const graph = p.graphs.find(g => g.selected);
+            if (graph != currentGraph) {
+                currentGraph = graph;
+                editor.load(currentGraph.nodeGroup);
+            }
+        });
     });
 
     export function updatePreviews(previews) {

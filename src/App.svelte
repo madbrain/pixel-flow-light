@@ -2,8 +2,7 @@
     import FlowGraphEditor from "./FlowGraphEditor.svelte";
     import { EngineInterface } from "./engine-interface";
     import { onMount } from "svelte";
-    import { graph } from "./store";
-    import { example } from "./examples";
+    import { graph, project } from "./store";
     import { catalog } from "./store";
     import { loader } from "./loader";
     
@@ -21,8 +20,8 @@
         });
 
         const engine = new EngineInterface(editor);
-        return graph.subscribe(g => {
-            engine.update(g);
+        return project.subscribe(p => {
+            engine.update(p);
         });
     })
 </script>
@@ -35,4 +34,4 @@
     }
 </style>
 
-<FlowGraphEditor bind:this={editor} nodeGroup={example} />
+<FlowGraphEditor bind:this={editor} />

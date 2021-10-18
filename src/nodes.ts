@@ -53,6 +53,34 @@ export interface Processor {
     evaluate(inputs: {[id: string]: any}, globals?: Globals): EvaluationResult;
 }
 
+const inputsProcessor = {
+    nodeDefinition: {
+        id: "inputs",
+        label: "Inputs",
+        categories: "io",
+        properties: [] // TODO find a way to edit properties
+    },
+    evaluate: (inputs: {[id: string]: any}, globals: Globals) => {
+        const outputs = {};
+        let preview = undefined;
+        return { outputs, preview };
+    }
+}
+
+const outputsProcessor = {
+    nodeDefinition: {
+        id: "outputs",
+        label: "Outputs",
+        categories: "io",
+        properties: [] // TODO find a way to edit properties
+    },
+    evaluate: (inputs: {[id: string]: any}, globals: Globals) => {
+        const outputs = {};
+        let preview = undefined;
+        return { outputs, preview };
+    }
+}
+
 const inputImageProcessor = {
     nodeDefinition: {
         id: "image-input",
@@ -481,6 +509,8 @@ export const processors: Processor[] = [
     inputImageProcessor,
     viewerProcessor,
     chartViewerProcessor,
+    inputsProcessor,
+    outputsProcessor,
 
     grayscaleProcessor,
     histogramProcessor,
@@ -492,7 +522,7 @@ export const processors: Processor[] = [
     blobHierarchyProcessor,
 
     argmaxProcessor,
-]
+];
 
 export const nodeDefinitions: NodeDefinition[] = processors.map(processor => processor.nodeDefinition);
 
