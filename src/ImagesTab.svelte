@@ -33,11 +33,17 @@
         margin: 10px;
         list-style-type: none;
     }
+    span.buttons {
+        visibility: hidden;
+    }
+    li:hover span.buttons {
+        visibility: visible;
+    }
 </style>
 
 <input type="file" accept="image/png, image/jpeg" on:change={(e) => handleFiles(e.srcElement.files)}>
 <ul>
     {#each images as image}
-    <li>{image.name} <RoundButton on:click={() => removeImage(image)} icon={faTrash}/></li>
+    <li>{image.name} <span class="buttons"><RoundButton on:click={() => removeImage(image)} icon={faTrash}/></span></li>
     {/each}
 </ul>

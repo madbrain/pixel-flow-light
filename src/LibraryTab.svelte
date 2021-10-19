@@ -5,10 +5,16 @@
     import ValueInput from "./components/ValueInput.svelte";
     import { faTrash, faPlus, faEdit } from '@fortawesome/free-solid-svg-icons';
     import { project } from "./store";
+    import { TabState } from "./tab-state";
 
     let valueInput;
     let currentProject;
     let graphs = [];
+    let hide = true;
+
+    const buttons = [
+        { action: addGraph, icon: faPlus }
+    ];
 
     onMount(() => {
         return project.subscribe(p => {
@@ -17,12 +23,12 @@
         });
     });
 
-    const buttons = [
-        { action: addGraph, icon: faPlus }
-    ];
+    export function refresh(mode) {
+        hide = mode == TabState.COLLAPSED;
+    }
 
     function addGraph() {
-        const graph = { name: "Unnamed", removable: true, nodeGroup: {
+        const graph = { name: "Unnamed", nodeGroup: {
             nodes: [],
             connections: [],
             canvas: {
@@ -40,11 +46,13 @@
     }
 
     function viewGraph(graph) {
-        currentProject.graphs = graphs = graphs.map(g => {
-            g.selected = g == graph;
-            return g;
-        });
-        project.set(currentProject);
+        if (!graph.selected) {
+            currentProject.graphs = graphs = graphs.map(g => {
+                g.selected = g == graph;
+                return g;
+            });
+            project.set(currentProject);
+        }
     }
 
     function renameGraph(graph) {
@@ -74,6 +82,9 @@
         margin: 10px;
         list-style-type: none;
     }
+    span {
+        display: inline-block;
+    }
     .selected span.name {
         background-color: var(--editor-color);
     }
@@ -94,13 +105,13 @@
 </style>
 
 <ul>
-    <ToolBar {buttons} />
+    <ToolBar {buttons} {hide} />
     {#each graphs as graph}
     <li class:selected={graph.selected}>
         <span class="name" on:click={() => viewGraph(graph)}>{graph.name}</span>
         <span class="buttons">
-            <RoundButton on:click={() => renameGraph(graph)} icon={faEdit}/>
-            {#if graph.removable}<RoundButton on:click={() => removeGraph(graph)} icon={faTrash}/>{/if}
+            {#if !graph.isMain}<RoundButton on:click={() => renameGraph(graph)} icon={faEdit}/>
+            <RoundButton on:click={() => removeGraph(graph)} icon={faTrash}/>{/if}
         </span>
     </li>
     {/each}

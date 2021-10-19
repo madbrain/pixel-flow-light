@@ -1,9 +1,9 @@
 <script>
     import { onMount } from "svelte";
     import { faPlus, faMinus, faCrosshairs, faLayerGroup } from '@fortawesome/free-solid-svg-icons';
-    import RoundButton from "./components/RoundButton.svelte";
     import { viewerContent } from "./store";
-import ToolBar from "./components/ToolBar.svelte";
+    import { TabState } from "./tab-state";
+    import ToolBar from "./components/ToolBar.svelte";
 
     const ZOOM_STEP = 1.2;
 
@@ -15,6 +15,7 @@ import ToolBar from "./components/ToolBar.svelte";
     let zoom = 1.0;
     let width;
     let height;
+    let hide = true;
 
     let imageCanvas;
     let imageContext;
@@ -55,12 +56,17 @@ import ToolBar from "./components/ToolBar.svelte";
         })
     });
 
-    export function refresh() {
-        const r = contentElement.getBoundingClientRect();
-        width = r.width;
-        height = r.height;
+    export function refresh(mode) {
+        hide = mode == TabState.COLLAPSED;
         setTimeout(() => {
-            if (needFit) zoomFit(); else drawImage();
+            if (contentElement) {
+                const r = contentElement.getBoundingClientRect();
+                width = r.width;
+                height = r.height;
+                setTimeout(() => {
+                    if (needFit) zoomFit(); else drawImage();
+                }, 10);
+            }
         }, 10);
     }
 
@@ -159,7 +165,7 @@ import ToolBar from "./components/ToolBar.svelte";
 </style>
 
 <div class="main" bind:this={contentElement}>
-    <ToolBar {buttons}>
+    <ToolBar {buttons} {hide}>
         <div class="layer-selector" class:hide={hideLayerSelector}>
             {#if content && content.layers}
             <ul>

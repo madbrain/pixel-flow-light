@@ -1,16 +1,14 @@
 <script>
     import Fa from 'svelte-fa';
     import { faArrowUp, faArrowDown, faExpand, faCompress, faImage, faEye, faBook, faFileExport } from '@fortawesome/free-solid-svg-icons';
+    import { TabState } from "./tab-state";
     import RoundButton from "./components/RoundButton.svelte";
     import ExportTab from './ExportTab.svelte';
     import ImagesTab from './ImagesTab.svelte';
     import ViewerTab from './ViewerTab.svelte';
     import LibraryTab from './LibraryTab.svelte';
 
-    const OPEN = "open";
-    const FULLSCREEN = "fullscreen";
-    const COLLAPSED = "collapsed";
-    let mode = COLLAPSED;
+    let mode = TabState.COLLAPSED;
 
     let tabs = [
         { label: "Images", component: ImagesTab, icon: faImage },
@@ -24,32 +22,30 @@
     $ : refresh(instance, mode);
 
     function refresh(instance, mode) {
-        setTimeout(() => {
-            if (instance && instance.refresh) {
-                instance.refresh()
-            }
-        }, 10);
+        if (instance && instance.refresh) {
+            instance.refresh(mode);
+        }
     }
 
     function toggleCollapsed() {
-        if (mode == COLLAPSED) {
-            mode = OPEN;
+        if (mode == TabState.COLLAPSED) {
+            mode = TabState.OPEN;
         } else {
-            mode = COLLAPSED;
+            mode = TabState.COLLAPSED;
         }
     }
 
     function toggleFull() {
-        if (mode == FULLSCREEN) {
-            mode = OPEN;
+        if (mode == TabState.FULLSCREEN) {
+            mode = TabState.OPEN;
         } else {
-            mode = FULLSCREEN;
+            mode = TabState.FULLSCREEN;
         }
     }
 
     function select(tab) {
-        if (mode == COLLAPSED) {
-            mode = OPEN;
+        if (mode == TabState.COLLAPSED) {
+            mode = TabState.OPEN;
         }
         active = tab;
     }
@@ -115,7 +111,7 @@
     }
 </style>
 
-<div class="container" class:collapsed={mode==COLLAPSED} class:fullscreen={mode==FULLSCREEN}>
+<div class="container" class:collapsed={mode==TabState.COLLAPSED} class:fullscreen={mode==TabState.FULLSCREEN}>
     <header>
         <ul>
             {#each tabs as tab}
@@ -123,8 +119,8 @@
             {/each}
         </ul>
         <div class="buttons">
-            <RoundButton on:click={() => toggleFull()} icon={mode != FULLSCREEN ? faExpand : faCompress}/>
-            <RoundButton on:click={() => toggleCollapsed()} icon={mode != COLLAPSED ? faArrowDown : faArrowUp}/>
+            <RoundButton on:click={() => toggleFull()} icon={mode != TabState.FULLSCREEN ? faExpand : faCompress}/>
+            <RoundButton on:click={() => toggleCollapsed()} icon={mode != TabState.COLLAPSED ? faArrowDown : faArrowUp}/>
         </div>
     </header>
     <div class="content">

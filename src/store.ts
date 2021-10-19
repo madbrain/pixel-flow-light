@@ -22,7 +22,7 @@ export interface Graph {
     name: string;
     nodeGroup: NodeGroupIO;
     selected?: boolean;
-    removable?: boolean;
+    isMain?: boolean;
 }
 
 export interface Project {
@@ -30,7 +30,7 @@ export interface Project {
 }
 
 export const project = writable<Project>({ graphs: [
-    { name: "Main", nodeGroup: example, selected: true }
+    { name: "Main", nodeGroup: example, selected: true, isMain: true }
 ] });
 
 export const catalog = writable([]);
