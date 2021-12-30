@@ -1,4 +1,4 @@
-import type { CatalogImage } from "./store";
+import type { CatalogImage } from "./api";
 
 export class ImageLoader {
 

@@ -1,9 +1,9 @@
 
-import type { NodeGroup, NodeGroupIO } from "@madbrain/node-graph-editor";
 import type { Previews } from "./engine";
 import type { Rectangle } from "./geometry";
 import type { Preview } from "./nodes";
-import { catalog, CatalogImage, viewerContent, progressMonitor, Project } from "./store";
+import type { CatalogImage, Project } from "./api";
+import { catalog, viewerContent, progressMonitor} from "./store";
 
 export class EngineInterface {
     worker: Worker;

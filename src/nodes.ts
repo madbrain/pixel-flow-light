@@ -1,15 +1,16 @@
 
 import { CommonValueType, NodeDefinition, PropertyType, ValueDefinition, GraphicalHelper,
     Color, NodeProperty, PropertyHandler, getDefaultPropertyHandler, Node, Editor, State,
-    Renderer, Point, rgb, Align, Event, NodePropertyView, IdleState, ChangePropertyValueCommand, NodeFactory} from "@madbrain/node-graph-editor";
+    Renderer, Point, rgb, Align, Event, NodePropertyView, IdleState, ChangePropertyValueCommand, NodeFactory,
+    NodeRegistry} from "@madbrain/node-graph-editor";
 import { processOutlines } from "./ocr/blob";
 import { Block } from "./ocr/block";
 import { argmax, binarization, buildHistogram, distanceImage, otsuLevels, toGrayscale } from "./compute";
 import { pointAt, Rectangle } from "./geometry";
 import { ImageMode } from "./ocr/image";
 import { MarchingSquare } from "./ocr/marching-square";
-import type { CatalogImage, Layer, ViewerModel } from "./store";
-import { catalog } from "./store";
+import type { CatalogImage, Graph, Layer, Project, ViewerModel } from "./api";
+import { catalog, project } from "./store";
 
 export interface Globals {
     getImages(): CatalogImage[];
@@ -53,12 +54,21 @@ export interface Processor {
     evaluate(inputs: {[id: string]: any}, globals?: Globals): EvaluationResult;
 }
 
-const inputsProcessor = {
+const inputsProcessor: Processor = {
     nodeDefinition: {
         id: "inputs",
         label: "Inputs",
         categories: "io",
-        properties: [] // TODO find a way to edit properties
+        properties: [
+            {
+                id: "inputs",
+                label: "Inputs",
+                type: PropertyType.NEW_OUTPUT,
+                valueType: { type: CommonValueType.LABEL },
+                linkable: true,
+                editable: true
+            }
+        ]
     },
     evaluate: (inputs: {[id: string]: any}, globals: Globals) => {
         const outputs = {};
@@ -72,7 +82,16 @@ const outputsProcessor = {
         id: "outputs",
         label: "Outputs",
         categories: "io",
-        properties: [] // TODO find a way to edit properties
+        properties: [
+            {
+                id: "outputs",
+                label: "Outputs",
+                type: PropertyType.NEW_INPUT,
+                valueType: { type: CommonValueType.LABEL },
+                linkable: true,
+                editable: true
+            }
+        ]
     },
     evaluate: (inputs: {[id: string]: any}, globals: Globals) => {
         const outputs = {};
@@ -524,7 +543,7 @@ export const processors: Processor[] = [
     argmaxProcessor,
 ];
 
-export const nodeDefinitions: NodeDefinition[] = processors.map(processor => processor.nodeDefinition);
+const nodeDefinitions: NodeDefinition[] = processors.map(processor => processor.nodeDefinition);
 
 let images: CatalogImage[] = [];
 
@@ -577,6 +596,9 @@ export class NodeGraphicalHelper implements GraphicalHelper {
         if (node.definition.categories == "io") {
             return { r: 0xec, g: 0x73, b: 0x37 }; // orange
         }
+        if (node.definition.categories == "local") {
+            return { r: 0x40, g: 0x63, b: 0xc7 }; // purple
+        }
         return { r: 0x00, g: 0xa9, b: 0x6a }; // green
     }
 
@@ -598,5 +620,73 @@ export class NodeGraphicalHelper implements GraphicalHelper {
     }
 }
 
+class DynamicNodeRegistry implements NodeRegistry {
+    private nodeDefinitionByType: { [key: string]: NodeDefinition } = {};
+    private localNodeDefinitions: NodeDefinition[] = [];
+
+    constructor (private nodeDefinitions: NodeDefinition[]) {
+        project.subscribe(p => {
+            this.buildLocalDefinitions(p);
+            this.refresh();
+        })
+    }
+
+    private buildLocalDefinitions(project: Project) {
+        this.localNodeDefinitions = project.graphs
+            .filter(g => !g.isMain)
+            .map(g => this.buildDefinition(g));
+    }
+
+    private buildDefinition(g: Graph) {
+        let properties = [];
+        g.nodeGroup.nodes.forEach(node => {
+            if (node.kind === "frame") {
+                // TODO traverse frames
+            } else {
+                if (node.type === "inputs") {
+                    const inputsProperties = node.properties["inputs"];
+                    properties.push(...Object.keys(inputsProperties)
+                        .map(name => this.makeProperty(name, inputsProperties[name], PropertyType.INPUT)));
+                } else if (node.type === "outputs") {
+                    const outputsProperties = node.properties["outputs"];
+                    properties.push(...Object.keys(outputsProperties)
+                        .map(name => this.makeProperty(name, outputsProperties[name], PropertyType.OUTPUT)));
+                }
+            } 
+        })
+        return {
+            id: "app:" + g.name.toLowerCase(), // TODO snakify
+            label: g.name,
+            categories: "local",
+            properties: properties
+        }
+    }
+
+    // TODO follow connection to find type
+    private makeProperty(name: string, label: string, type: PropertyType) {
+        return {
+            id: name,
+            label: label,
+            type: type,
+            linkable: true,
+            valueType: { type: CommonValueType.INTEGER } // TODO comment trouver le type ? follow connection ?
+        };
+    }
+
+    private refresh() {
+        nodeDefinitions.concat(this.localNodeDefinitions).forEach(nodeDefinition => {
+            this.nodeDefinitionByType[nodeDefinition.id] = nodeDefinition;
+        });
+    }
+
+    lookup(type: string): NodeDefinition {
+        return this.nodeDefinitionByType[type];
+    }
+
+    all() {
+        return this.nodeDefinitions.concat(this.localNodeDefinitions);
+    }
+}
+
 export const graphicalHelper = new NodeGraphicalHelper();
-export const nodeFactory = new NodeFactory(nodeDefinitions);
+export const nodeFactory = new NodeFactory(new DynamicNodeRegistry(nodeDefinitions));

@@ -2,7 +2,7 @@
 import type { NodeGroup } from "@madbrain/node-graph-editor";
 import { Engine, ProgressMonitor } from "./engine";
 import { Globals, nodeFactory } from "./nodes";
-import type { CatalogImage, ViewerModel } from "./store";
+import type { CatalogImage, ViewerModel } from "./api";
 
 declare function postMessage(message: any, transferables?: Transferable[]);
 

@@ -1,7 +1,6 @@
 <script>
     import { onMount } from "svelte";
     import { project } from "./store";
-    import { nodeFactory } from "./nodes";
 
     let content = "";
 
