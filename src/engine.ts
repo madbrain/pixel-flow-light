@@ -1,15 +1,26 @@
-import { NodeGroup, Node, PropertyType, NodeProperty } from "@madbrain/node-graph-editor";
-import { EvaluationResult, Globals, Preview, Processor, processors } from "./nodes";
+import { NodeGroup, Node, PropertyType, NodeProperty, isOutput } from "@madbrain/node-graph-editor";
+import { globals } from "svelte/internal";
+import type { Project } from "./api";
+import { EvaluationResult, Globals, Preview, Processor, processors, nodeFactory, makeNodeId } from "./nodes";
 
 const processorByType = new Map<string, Processor>();
 
 processors.forEach(processor => processorByType.set(processor.nodeDefinition.id, processor));
 
-function evaluateNode(type: string, inputs: {[id: string]: any}, globals: Globals): EvaluationResult  {
+interface Context {
+    globals: Globals;
+    functions: Map<String, LocalFunction>;
+}
+
+function evaluateNode(type: string, inputs: {[id: string]: any}, context: Context): EvaluationResult  {
+    const localFunction = context.functions.get(type);
+    if (localFunction) {
+        return localFunction.evaluate(inputs, context);
+    }
     const processor = processorByType.get(type);
 
     if (processor) {
-        return processor.evaluate(inputs, globals);
+        return processor.evaluate(inputs, context.globals);
     }
     console.log("Unknown processor", type)
     return { outputs: {} };
@@ -109,7 +120,7 @@ class NodeInstance {
             });
     }
 
-    evaluate(previews: { [name: string]: Preview }, globals: Globals): void {
+    evaluate(previews: { [name: string]: Preview }, context: Context): void {
         this.updateNeedEvaluation();
         if (this.needEvaluation) {
             console.log("Evaluating ", this.node.definition.id);
@@ -117,7 +128,7 @@ class NodeInstance {
             for (let [prop, value] of this.inputs.entries()) {
                 inputs[prop] = value.getValue();
             }
-            const { outputs, preview } = evaluateNode(this.node.definition.id, inputs, globals);
+            const { outputs, preview } = evaluateNode(this.node.definition.id, inputs, context);
             if (preview) {
                 previews[this.node.id] = preview;
             }
@@ -154,13 +165,127 @@ export interface ProgressMonitor {
     end();
 }
 
+class LocalFunction {
+    
+    constructor(public name: String, private nodes: Node[]) {}
+
+    evaluate(inputs: { [id: string]: any; }, context: Context): EvaluationResult {
+        const nodeOutputs = new Map<Node, {}>();
+        const funcOutputs = {};
+        this.nodes.forEach(node => {
+            if (node.definition.id == "inputs") {
+                const values = {}
+                node.findProperty("inputs").subProperties.forEach(prop => {
+                    values[prop.definition.id] = inputs[prop.definition.id];
+                });
+                nodeOutputs.set(node, values);
+            } else if (node.definition.id == "outputs") {
+                node.findProperty("outputs").subProperties.forEach(prop => {
+                    const outputProp = prop.connections[0].opposite(prop);
+                    const value = nodeOutputs.get(outputProp.node)[outputProp.definition.id];
+                    funcOutputs[prop.definition.id] = value;
+                });
+            } else {
+                const nodeInputs = {};
+                node.properties
+                    .filter(prop => prop.definition.type == PropertyType.INPUT)
+                    .forEach(prop => {
+                        if (prop.isConnected()) {
+                            const inputProp = prop.connections[0].opposite(prop);
+                            const value = nodeOutputs.get(inputProp.node)[inputProp.definition.id];
+                            nodeInputs[prop.definition.id] = value;
+                        }
+                    })
+                const { outputs } = evaluateNode(node.definition.id, nodeInputs, context);
+                nodeOutputs.set(node, outputs);
+            }
+        });
+        return { outputs: funcOutputs };
+    }
+}
+
 export class Engine {
 
     constructor(private globals: Globals, private progressMonitor: ProgressMonitor) {}
 
     private instances: NodeInstance[] = [];
 
-    update(graph: NodeGroup): Previews {
+    update(project: Project): Previews {
+        const nodeGroups = project.graphs.map(g => ({ name: makeNodeId(g.name), nodeGroup: nodeFactory.load(g.nodeGroup) }));
+        
+        // TODO should make some cache on local functions as well
+        const localFunctions = new Map<String, LocalFunction>();
+        nodeGroups.filter(g => g.name != "app:main").forEach(g => {
+            const func = this.compileNodeGroup(g.name, g.nodeGroup);
+            localFunctions.set(func.name, func);
+        })
+
+        return this.updateGraph(nodeGroups.find(g => g.name === "app:main").nodeGroup, { functions: localFunctions, globals: this.globals });
+    }
+
+    private compileNodeGroup(name: String, nodeGroup: NodeGroup) {
+        console.log("ENGINE COMPILE", name, nodeGroup);
+        const outputNodes = nodeGroup.nodes.filter(node => node.definition.id == "outputs");
+
+        const ancestors = new Map<Node, Node[]>();
+        nodeGroup.nodes.forEach(node => ancestors.set(node, this.findAncestors(node)));
+        
+        const reachables = this.findReachables(outputNodes, ancestors);
+        
+        // Topological sort again
+        const work = nodeGroup.nodes.slice();
+        const orderedNodes = [];
+        while (work.length > 0) {
+            const node = work.pop();
+            if (reachables.indexOf(node) < 0) {
+                console.log("PRUNE", node.definition.id);
+            } else if (ancestors.get(node).every(i => orderedNodes.indexOf(i) >= 0)) {
+                orderedNodes.push(node);
+            } else {
+                work.unshift(node);
+            }
+        }
+        return new LocalFunction(name, orderedNodes);
+    }
+
+    private findReachables(outputNodes: Node[], ancestors: Map<Node, Node[]>) {
+        const work = outputNodes.slice();
+        const reachables = outputNodes.slice();
+        while (work.length > 0) {
+            const node = work.pop();
+            ancestors.get(node).forEach(n => {
+                if (reachables.indexOf(n) < 0) {
+                    reachables.push(n);
+                    work.push(n)
+                }
+            });
+        }
+        return reachables;
+    }
+
+    private findAncestors(node: Node): Node[] {
+        const result = [];
+        function collect(prop: NodeProperty) {
+            prop.connections.forEach(c => {
+                const n = c.opposite(prop).node;
+                if (result.indexOf(n) < 0) {
+                    result.push(n);
+                }
+            });
+        }
+        node.properties.forEach(prop => {
+            if (! isOutput(prop.definition.type)) {
+                if (prop.subProperties && prop.subProperties.length > 0) {
+                    prop.subProperties.forEach(p => collect(p));
+                } else {
+                    collect(prop);
+                }
+            }
+        });
+        return result;
+    }
+
+    private updateGraph(graph: NodeGroup, context: Context): Previews {
 
         // Sync
         let instanceMap = new Map<string, NodeInstance>();
@@ -190,7 +315,7 @@ export class Engine {
         let count = 0;
         this.instances.forEach(instance => {
             this.progressMonitor.progress(count++ / this.instances.length, instance.node.definition.label);
-            instance.evaluate(previews, this.globals);
+            instance.evaluate(previews, context);
             this.progressMonitor.progress(count / this.instances.length, instance.node.definition.label);
         });
         this.progressMonitor.end();

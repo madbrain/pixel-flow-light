@@ -36,9 +36,7 @@ export class EngineInterface {
     }
 
     update(project: Project) {
-        // TODO handle project!
-        const graph = project.graphs.find(g => g.name === "Main").nodeGroup;
-        this.worker.postMessage({ type: "graph", graph: graph });
+        this.worker.postMessage({ type: "project", project: project });
     }
 
     private processPreviews(previews: Previews): { [key: string]: ImageData } {

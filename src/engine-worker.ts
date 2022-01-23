@@ -1,7 +1,6 @@
 
-import type { NodeGroup } from "@madbrain/node-graph-editor";
 import { Engine, ProgressMonitor } from "./engine";
-import { Globals, nodeFactory } from "./nodes";
+import type { Globals } from "./nodes";
 import type { CatalogImage, ViewerModel } from "./api";
 
 declare function postMessage(message: any, transferables?: Transferable[]);
@@ -32,14 +31,13 @@ const globals = new EngineGlobals();
 const engine = new Engine(globals, new EngineProgressListener());
 
 addEventListener("message", (message: MessageEvent<any>) => {
-    if (message.data.type == "graph") {
-        const graph: NodeGroup = nodeFactory.load(message.data.graph);
-        const previews = engine.update(graph);
+    if (message.data.type == "project") {
+        const previews = engine.update(message.data.project);
         postMessage({ type: "previews", previews });
     } else if (message.data.type == "catalog") {
         globals.catalog = message.data.catalog;
     } else {
-        console.log("WORKER: message", message.data);
+        console.log("WORKER: unknown message", message.data);
     }
 });
     

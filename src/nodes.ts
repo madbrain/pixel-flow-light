@@ -620,6 +620,10 @@ export class NodeGraphicalHelper implements GraphicalHelper {
     }
 }
 
+export function makeNodeId(value: string): string {
+    return "app:" + value.split(" ").map(x => x.toLowerCase()).join("-");
+}
+
 class DynamicNodeRegistry implements NodeRegistry {
     private nodeDefinitionByType: { [key: string]: NodeDefinition } = {};
     private localNodeDefinitions: NodeDefinition[] = [];
@@ -641,7 +645,7 @@ class DynamicNodeRegistry implements NodeRegistry {
         let properties = [];
         g.nodeGroup.nodes.forEach(node => {
             if (node.kind === "frame") {
-                // TODO traverse frames
+                // TODO traverse frames to find I/O
             } else {
                 if (node.type === "inputs") {
                     const inputsProperties = node.properties["inputs"];
@@ -655,7 +659,7 @@ class DynamicNodeRegistry implements NodeRegistry {
             } 
         })
         return {
-            id: "app:" + g.name.toLowerCase(), // TODO snakify
+            id:  makeNodeId(g.name.toLowerCase()),
             label: g.name,
             categories: "local",
             properties: properties
