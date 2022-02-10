@@ -12,7 +12,8 @@
         // preload some images
         Promise.all([
             loader.loadURL("alice.jpg", "alice.jpg"),
-            loader.loadURL("lines.jpg", "lines.jpg")
+            loader.loadURL("lines.jpg", "lines.jpg"),
+            loader.loadURL("binero1.jpg", "binero1.jpg")
         ]).then(images => {
             catalog.set(images);
         }, e => {

@@ -1,6 +1,6 @@
 
 import type { NodeGroupIO } from "@madbrain/node-graph-editor";
-import type { Rectangle } from "./geometry";
+import type { Point, Rectangle } from "./geometry";
 
 export interface CatalogImage {
     name: string;
@@ -12,9 +12,15 @@ export interface ViewerModel {
     layers: Layer[];
 }
 
+export interface Line {
+    from: Point;
+    to: Point;
+}
+
 export interface Layer {
     name: string;
     marks: Rectangle[];
+    lines: Line[];
 }
 
 export interface Graph {

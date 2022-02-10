@@ -69,6 +69,7 @@ export class EngineInterface {
                 const height = 500 * values[i] / max;
                 this.internalContext.lineTo(i*step, 500 - height);
             }
+            this.internalContext.lineTo(500, 500);
             this.internalContext.closePath();
             this.internalContext.fill();
             return this.internalContext.getImageData(0, 0, 500, 500);

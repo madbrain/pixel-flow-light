@@ -90,6 +90,12 @@
                             context.rect(marker.x, marker.y, marker.width, marker.height);
                             context.stroke();
                         });
+                        layer.lines.forEach(line => {
+                            context.beginPath();
+                            context.moveTo(line.from.x, line.from.y);
+                            context.lineTo(line.to.x, line.to.y);
+                            context.stroke();
+                        });
                     }
                 });
             }

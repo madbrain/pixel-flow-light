@@ -5,7 +5,8 @@ import { CommonValueType, NodeDefinition, PropertyType, ValueDefinition, Graphic
     NodeRegistry} from "@madbrain/node-graph-editor";
 import { processOutlines } from "./ocr/blob";
 import { Block } from "./ocr/block";
-import { argmax, binarization, buildHistogram, distanceImage, otsuLevels, toGrayscale } from "./compute";
+import { argmax, binarization, buildHistogram, distanceImage, otsuLevels, toGrayscale,
+    gaussianBlur, sobelEdgeDetect, cannyPostProcess, houghTransform, houghToLines} from "./compute";
 import { pointAt, Rectangle } from "./geometry";
 import { ImageMode } from "./ocr/image";
 import { MarchingSquare } from "./ocr/marching-square";
@@ -169,20 +170,22 @@ const viewerProcessor = {
             let layers: Layer[] = [];
             let marks: Rectangle[] = [];
             if (inputs["marks"]) {
-                let input = <any>inputs["marks"];
+                const input = <any>inputs["marks"];
                 function newLayer(name: string, boxes: Rectangle[]) {
                     marks.push(...boxes);
-                    layers.push({ name: name, marks: boxes }); 
+                    layers.push({ name: name, marks: boxes, lines: [] }); 
                 }
                 
                 if (input.outlines) {
                     newLayer("outlines", input.outlines.map(b => b.bounds))
-                } else {
+                } else if (input.blobs) {
                     const block = <Block>input;
                     newLayer("blobs", block.blobs.map(b => b.boundingBox()));
                     newLayer("noises", block.noises.map(b => b.boundingBox()));
                     newLayer("smalls", block.smalls.map(b => b.boundingBox()));
                     newLayer("larges", block.larges.map(b => b.boundingBox())); 
+                } else {
+                    layers.push({ name: "lines", marks: [], lines: input });
                 }
             }
             globals.setViewer({ image: inputImage, layers });
@@ -247,6 +250,248 @@ const grayscaleProcessor = {
         let preview = undefined;
         if (inputs["input"]) {
             outputs["output"] = toGrayscale(inputs["input"]);
+        }
+        return { outputs, preview };
+    }
+};
+
+const gaussianBlurProcessor: Processor = {
+    nodeDefinition: {
+        id: "gaussian-blur",
+        label: "Gaussian Blur",
+        categories: "filters",
+        properties: [
+            {
+                id: 'output',
+                label: 'Output',
+                type: PropertyType.OUTPUT,
+                linkable: true,
+                valueType: IMAGE
+            },
+            {
+                id: 'input',
+                label: 'Input',
+                type: PropertyType.INPUT,
+                linkable: true,
+                valueType: IMAGE
+            },
+            {
+                id: 'size',
+                label: 'Size',
+                type: PropertyType.INPUT,
+                linkable: true,
+                editable: true,
+                valueType: {
+                    type: CommonValueType.INTEGER,
+                    range: { min: 1, max: 5 },
+                    
+                },
+                defaultValue: 2
+            },
+            {
+                id: 'sigma',
+                label: 'Sigma',
+                type: PropertyType.INPUT,
+                linkable: true,
+                editable: true,
+                valueType: {
+                    type: CommonValueType.REAL,
+                    range: { min: 0.1, max: 2 },
+                    
+                },
+                defaultValue: 1.4
+            }
+        ]
+    },
+    evaluate: (inputs: {[id: string]: any}) => {
+        const outputs = {};
+        let preview = undefined;
+        if (inputs["input"]) {
+            outputs["output"] = gaussianBlur(inputs["input"], inputs["size"], inputs["sigma"]);
+        }
+        return { outputs, preview };
+    }
+};
+
+const sobelEdgeDetectProcessor: Processor = {
+    nodeDefinition: {
+        id: "sobel-edge-detect",
+        label: "Sobel Edge Detect",
+        categories: "filters",
+        properties: [
+            {
+                id: 'output',
+                label: 'Output',
+                type: PropertyType.OUTPUT,
+                linkable: true,
+                valueType: IMAGE
+            },
+            {
+                id: 'angles',
+                label: 'Angles',
+                type: PropertyType.OUTPUT,
+                linkable: true,
+                valueType: ARRAY
+            },
+            {
+                id: 'input',
+                label: 'Input',
+                type: PropertyType.INPUT,
+                linkable: true,
+                valueType: IMAGE
+            }
+        ]
+    },
+    evaluate: (inputs: {[id: string]: any}) => {
+        const outputs = {};
+        let preview = undefined;
+        if (inputs["input"]) {
+            const { image, arg } = sobelEdgeDetect(inputs["input"]);
+            outputs["output"] = image;
+            outputs["angles"] = arg;
+        }
+        return { outputs, preview };
+    }
+};
+
+const cannyPostProcessProcessor: Processor = {
+    nodeDefinition: {
+        id: "canny-post-process",
+        label: "Canny Post Process",
+        categories: "filters",
+        properties: [
+            {
+                id: 'output',
+                label: 'Output',
+                type: PropertyType.OUTPUT,
+                linkable: true,
+                valueType: IMAGE
+            },
+            {
+                id: 'input',
+                label: 'Input',
+                type: PropertyType.INPUT,
+                linkable: true,
+                valueType: IMAGE
+            },
+            {
+                id: 'angles',
+                label: 'Angles',
+                type: PropertyType.INPUT,
+                linkable: true,
+                valueType: ARRAY
+            }
+        ]
+    },
+    evaluate: (inputs: {[id: string]: any}) => {
+        const outputs = {};
+        let preview = undefined;
+        if (inputs["input"] && inputs["angles"]) {
+            outputs["output"] = cannyPostProcess(inputs["input"], inputs["angles"]);
+        }
+        return { outputs, preview };
+    }
+};
+
+const houghTransformProcessor: Processor = {
+    nodeDefinition: {
+        id: "hough-transform",
+        label: "Hough Transform",
+        categories: "analysis",
+        properties: [
+            {
+                id: 'output',
+                label: 'Output',
+                type: PropertyType.OUTPUT,
+                linkable: true,
+                valueType: IMAGE
+            },
+            {
+                id: 'input',
+                label: 'Input',
+                type: PropertyType.INPUT,
+                linkable: true,
+                valueType: IMAGE
+            }
+        ]
+    },
+    evaluate: (inputs: {[id: string]: any}) => {
+        const outputs = {};
+        let preview = undefined;
+        if (inputs["input"]) {
+            outputs["output"] = houghTransform(inputs["input"]);
+        }
+        return { outputs, preview };
+    }
+};
+
+const houghToLinesProcessor: Processor = {
+    nodeDefinition: {
+        id: "hough-to-lines",
+        label: "Hough To Lines",
+        categories: "analysis",
+        properties: [
+            {
+                id: 'lines',
+                label: 'Lines',
+                type: PropertyType.OUTPUT,
+                linkable: true,
+                valueType: ARRAY
+            },
+            {
+                id: 'histo',
+                label: 'Histo',
+                type: PropertyType.OUTPUT,
+                linkable: true,
+                valueType: ARRAY
+            },
+            {
+                id: 'hough',
+                label: 'Hough',
+                type: PropertyType.INPUT,
+                linkable: true,
+                valueType: IMAGE
+            },
+            {
+                id: 'image',
+                label: 'Image',
+                type: PropertyType.INPUT,
+                linkable: true,
+                valueType: IMAGE
+            },
+            {
+                id: 'threshold',
+                label: 'Threshold',
+                type: PropertyType.INPUT,
+                linkable: true,
+                editable: true,
+                valueType: {
+                    type: CommonValueType.INTEGER,
+                    range: { min: 1, max: 255 },
+                    
+                },
+                defaultValue: 67
+            },
+            {
+                id: 'count',
+                label: 'Count',
+                type: PropertyType.INPUT,
+                linkable: true,
+                editable: true,
+                valueType: {
+                    type: CommonValueType.INTEGER,
+                },
+                defaultValue: 50
+            }
+        ]
+    },
+    evaluate: (inputs: {[id: string]: any}) => {
+        const outputs = {};
+        let preview = undefined;
+        if (inputs["hough"] && inputs["image"] && inputs["threshold"] && inputs["count"]) {
+            const { lines, histo } = houghToLines(inputs["hough"], inputs["image"], inputs["threshold"], inputs["count"]);
+            outputs["lines"] = lines;
+            outputs["histo"] = histo;
         }
         return { outputs, preview };
     }
@@ -532,6 +777,11 @@ export const processors: Processor[] = [
     outputsProcessor,
 
     grayscaleProcessor,
+    gaussianBlurProcessor,
+    sobelEdgeDetectProcessor,
+    cannyPostProcessProcessor,
+    houghTransformProcessor,
+    houghToLinesProcessor,
     histogramProcessor,
     otsuLevelsProcessor,
     binarizationProcessor,

@@ -1,6 +1,6 @@
 import {writable} from "svelte/store";
 import type { Project } from "./api";
-import { exampleProject } from "./examples";
+import { exampleProject } from "./examples2";
 
 export const project = writable<Project>(exampleProject);
 
