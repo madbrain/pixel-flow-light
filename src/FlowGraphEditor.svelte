@@ -47,7 +47,9 @@
     }
 </style>
 
-<div class="editor" bind:this={element}>
+<div>
+    <div class="editor" bind:this={element}>
+    </div>
+    <TabContainer />
+    <ProgressMonitor />
 </div>
-<TabContainer />
-<ProgressMonitor />

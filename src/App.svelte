@@ -1,8 +1,9 @@
 <script>
+    import Menu from "./components/Menu.svelte";
     import FlowGraphEditor from "./FlowGraphEditor.svelte";
     import { EngineInterface } from "./engine-interface";
     import { onMount } from "svelte";
-    import { graph, project } from "./store";
+    import { project } from "./store";
     import { catalog } from "./store";
     import { loader } from "./loader";
     
@@ -28,6 +29,7 @@
 </script>
 
 <style>
+    @import url('https://fonts.googleapis.com/css2?family=Roboto&display=swap');
     :global(html, body, *) {
         padding: 0;
         margin: 0;
@@ -35,4 +37,5 @@
     }
 </style>
 
+<Menu />
 <FlowGraphEditor bind:this={editor} />
